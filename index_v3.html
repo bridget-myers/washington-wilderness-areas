@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MapLibre GL JS - GeoJSON Polygons</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        #map {
+            flex: 1;
+            min-height: 60vh;
+        }
+
+        .sidebar {
+            background: white;
+            border-top: 2px solid #3498db;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 40vh;
+        }
+
+        .sidebar-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .wilderness-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+            margin: 0;
+        }
+
+        .wilderness-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .wilderness-item:hover {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+        }
+
+        .wilderness-item:active {
+            background-color: #e9ecef;
+        }
+
+        .wilderness-item.highlighted {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            font-weight: 500;
+        }
+
+        /* Scrollbar styling for webkit browsers */
+        .wilderness-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .wilderness-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .wilderness-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .wilderness-list::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+
+        /* Desktop styles */
+        @media (min-width: 768px) {
+            .container {
+                flex-direction: row;
+            }
+
+            #map {
+                flex: 1;
+                min-height: 100vh;
+            }
+
+            .sidebar {
+                width: 300px;
+                height: 100vh;
+                border-top: none;
+                border-left: 2px solid #3498db;
+                box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .sidebar-header {
+                font-size: 18px;
+                padding: 20px;
+            }
+
+            .wilderness-item {
+                padding: 15px 20px;
+                font-size: 15px;
+            }
+        }
+
+        /* Hide sidebar on small screens to keep the experience mobile-first */
+        @media (max-width: 767px) {
+            .sidebar {
+                display: none;
+            }
+
+            /* Make the map occupy the full viewport on mobile */
+            .container {
+                height: 100vh;
+            }
+
+            #map {
+                min-height: 100vh;
+                width: 100vw;
+            }
+        }
+
+        .maplibregl-popup {
+            max-width: 300px;
+        }
+
+        .maplibregl-popup-content {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .popup-content {
+            padding: 15px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .popup-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+
+        .popup-info {
+            color: #555;
+            margin: 5px 0;
+        }
+
+        .popup-info strong {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="sidebar-header">
+                Washington Wilderness Areas
+            </div>
+            <div class="wilderness-list" id="wilderness-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the map with a free light theme
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tiles.basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            center: [0, 0],
+            zoom: 2
+        });
+
+        // Track currently selected feature (persistent selection)
+        let selectedFeatureId = null;
+
+        // Create a popup instance
+        // Use closeOnClick: false so clicking another polygon doesn't only close the popup
+        // and require a second click to open the new one.
+        const popup = new maplibregl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            offset: 10
+        });
+
+        // Function to calculate bounds for a single feature
+        function getFeatureBounds(feature) {
+            const bounds = new maplibregl.LngLatBounds();
+
+            if (feature.geometry.type === 'Polygon') {
+                feature.geometry.coordinates[0].forEach(coord => {
+                    bounds.extend(coord);
+                });
+            } else if (feature.geometry.type === 'MultiPolygon') {
+                feature.geometry.coordinates.forEach(polygon => {
+                    polygon[0].forEach(coord => {
+                        bounds.extend(coord);
+                    });
+                });
+            }
+
+            return bounds;
+        }
+
+        // Function to populate the wilderness list
+        function populateWildernessList(features) {
+            const listContainer = document.getElementById('wilderness-list');
+
+            // Sort features by name
+            const sortedFeatures = features.sort((a, b) => {
+                const nameA = a.properties.name || 'Unnamed';
+                const nameB = b.properties.name || 'Unnamed';
+                return nameA.localeCompare(nameB);
+            });
+
+            sortedFeatures.forEach((feature, index) => {
+                const name = feature.properties.name || 'Unnamed Wilderness';
+                const listItem = document.createElement('div');
+                listItem.className = 'wilderness-item';
+                listItem.textContent = name;
+                // store both the sorted index and the feature id to allow lookups from map events
+                listItem.dataset.featureIndex = index;
+                listItem.dataset.featureId = (feature.id !== undefined && feature.id !== null) ? String(feature.id) : String(index);
+
+                // Add click event to fit bounds
+                listItem.addEventListener('click', () => {
+                    // Update selection (persistent)
+                    document.querySelectorAll('.wilderness-item.highlighted').forEach(item => item.classList.remove('highlighted'));
+                    listItem.classList.add('highlighted');
+                    const bounds = getFeatureBounds(feature);
+                    map.fitBounds(bounds, { padding: 50, duration: 1000 });
+                    const fid = feature.id !== undefined && feature.id !== null ? feature.id : index;
+                    selectedFeatureId = fid;
+                    // Update selection layers
+                    map.setFilter('polygon-selected', ['==', ['id'], selectedFeatureId]);
+                    map.setFilter('polygon-selected-stroke', ['==', ['id'], selectedFeatureId]);
+
+                    // Build and show popup (same style as map click)
+                    try { popup.remove(); } catch (e) { /* ignore */ }
+                    const properties = feature.properties || {};
+                    const name = properties.name || 'Unnamed Polygon';
+                    let popupContent = `
+                        <div class="popup-content">
+                            <div class="popup-title">${name}</div>
+                    `;
+                    // (Optional) include more properties later if desired
+                    popupContent += '</div>';
+                    const center = bounds.getCenter();
+                    popup.setLngLat(center).setHTML(popupContent).addTo(map);
+                    // Clear any hover highlight so selection stands out
+                    map.setFilter('polygon-hover', ['==', ['id'], -1]);
+                    map.setFilter('polygon-hover-stroke', ['==', ['id'], -1]);
+                });
+
+                listContainer.appendChild(listItem);
+            });
+        }
+
+        map.on('load', () => {
+            // Load the GeoJSON file
+            fetch('./all.geojson')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('GeoJSON loaded successfully:', data);
+
+                    // Ensure all features have an ID
+                    data.features.forEach((feature, index) => {
+                        if (!feature.id) {
+                            feature.id = index;
+                        }
+                    });
+
+                    // Add the GeoJSON data as a source with generateId option
+                    map.addSource('polygons', {
+                        'type': 'geojson',
+                        'data': data,
+                        'generateId': true // This ensures features get IDs if they don't have them
+                    });
+
+                    // Add a fill layer for the polygons with lighter opacity
+                    map.addLayer({
+                        'id': 'polygon-fill',
+                        'type': 'fill',
+                        'source': 'polygons',
+                        'paint': {
+                            'fill-color': '#3498db',
+                            'fill-opacity': 0.2, // Light default opacity
+                            'fill-outline-color': '#2980b9'
+                        }
+                    });
+
+                    // Add a stroke layer for polygon borders
+                    map.addLayer({
+                        'id': 'polygon-stroke',
+                        'type': 'line',
+                        'source': 'polygons',
+                        'paint': {
+                            'line-color': '#2980b9',
+                            'line-width': 1,
+                            'line-opacity': 0.5
+                        }
+                    });
+
+                    // Add hover layer that will be shown on mouse hover
+                    map.addLayer({
+                        'id': 'polygon-hover',
+                        'type': 'fill',
+                        'source': 'polygons',
+                        'paint': {
+                            'fill-color': '#3498db',
+                            'fill-opacity': 0.6
+                        },
+                        'filter': ['==', ['id'], -1] // Initially hide all features
+                    });
+
+                    // Add hover stroke layer
+                    map.addLayer({
+                        'id': 'polygon-hover-stroke',
+                        'type': 'line',
+                        'source': 'polygons',
+                        'paint': {
+                            'line-color': '#2980b9',
+                            'line-width': 3,
+                            'line-opacity': 1.0
+                        },
+                        'filter': ['==', ['id'], -1] // Initially hide all features
+                    });
+
+                    // Add persistent selection layers (above hover for clarity)
+                    map.addLayer({
+                        'id': 'polygon-selected',
+                        'type': 'fill',
+                        'source': 'polygons',
+                        'paint': {
+                            'fill-color': '#3498db', // distinct selection color
+                            'fill-opacity': 0.5
+                        },
+                        'filter': ['==', ['id'], -1]
+                    });
+
+                    map.addLayer({
+                        'id': 'polygon-selected-stroke',
+                        'type': 'line',
+                        'source': 'polygons',
+                        'paint': {
+                            'line-color': '#2980b9',
+                            'line-width': 4,
+                            'line-opacity': 1
+                        },
+                        'filter': ['==', ['id'], -1]
+                    });
+
+                    // Calculate bounds and fit map to data
+                    const bounds = new maplibregl.LngLatBounds();
+                    data.features.forEach(feature => {
+                        if (feature.geometry.type === 'Polygon') {
+                            feature.geometry.coordinates[0].forEach(coord => {
+                                bounds.extend(coord);
+                            });
+                        } else if (feature.geometry.type === 'MultiPolygon') {
+                            feature.geometry.coordinates.forEach(polygon => {
+                                polygon[0].forEach(coord => {
+                                    bounds.extend(coord);
+                                });
+                            });
+                        }
+                    });
+
+                    map.fitBounds(bounds, { padding: 50 });
+
+                    // Populate the wilderness list sidebar
+                    populateWildernessList(data.features);
+
+                    // Mouse events for interactivity
+                    map.on('mouseenter', 'polygon-fill', () => {
+                        map.getCanvas().style.cursor = 'pointer';
+                    });
+
+                    map.on('mouseleave', 'polygon-fill', () => {
+                        map.getCanvas().style.cursor = '';
+                        // Hide hover layers (but keep selection layers)
+                        map.setFilter('polygon-hover', ['==', ['id'], -1]);
+                        map.setFilter('polygon-hover-stroke', ['==', ['id'], -1]);
+                    });
+
+                    map.on('mousemove', 'polygon-fill', (e) => {
+                        if (e.features.length > 0) {
+                            const feature = e.features[0];
+                            const featureId = feature.id;
+                            // Don't override persistent selection style; hover only if not selected
+                            if (selectedFeatureId === null || selectedFeatureId !== featureId) {
+                                map.setFilter('polygon-hover', ['==', ['id'], featureId]);
+                                map.setFilter('polygon-hover-stroke', ['==', ['id'], featureId]);
+                            } else {
+                                // If hovering selected polygon, hide hover layers since selection layers show it
+                                map.setFilter('polygon-hover', ['==', ['id'], -1]);
+                                map.setFilter('polygon-hover-stroke', ['==', ['id'], -1]);
+                            }
+                        }
+                    });
+
+                    // Click event for selection + popup
+                    map.on('click', 'polygon-fill', (e) => {
+                        if (e.features.length > 0) {
+                            const feature = e.features[0];
+                            const properties = feature.properties;
+
+                            // Get the name from various possible property keys
+                            const name = properties.name ||
+
+                                'Unnamed Polygon';
+
+                            // Build popup content
+                            let popupContent = `
+                                <div class="popup-content">
+                                    <div class="popup-title">${name}</div>
+                            `;
+
+                            // Add other properties if they exist
+                            // const excludeKeys = ['name', 'Name', 'title', 'Title', 'label'];
+                            // Object.keys(properties).forEach(key => {
+                            //     if (!excludeKeys.includes(key) && properties[key] !== null && properties[key] !== '') {
+                            //         const value = properties[key];
+                            //         const displayKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                            //         popupContent += `<div class="popup-info"><strong>${displayKey}:</strong> ${value}</div>`;
+                            //     }
+                            // });
+
+                            popupContent += '</div>';
+
+                            // Ensure any existing popup is removed first so the new popup appears immediately
+                            try { popup.remove(); } catch (e) { /* ignore */ }
+
+                            // Show popup at click location
+                            popup.setLngLat(e.lngLat)
+                                .setHTML(popupContent)
+                                .addTo(map);
+
+                            // Persistent selection highlight & scroll to list item
+                            try {
+                                const fid = feature.id !== undefined && feature.id !== null ? String(feature.id) : null;
+                                if (fid !== null) {
+                                    // remove previous highlights
+                                    document.querySelectorAll('.wilderness-item.highlighted').forEach(item => item.classList.remove('highlighted'));
+
+                                    const listEl = document.querySelector(`.wilderness-item[data-feature-id="${fid}"]`);
+                                    if (listEl) {
+                                        listEl.classList.add('highlighted');
+                                        // ensure the list container scrolls so the item is visible
+                                        listEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                    // set persistent selection
+                                    selectedFeatureId = feature.id;
+                                    map.setFilter('polygon-selected', ['==', ['id'], selectedFeatureId]);
+                                    map.setFilter('polygon-selected-stroke', ['==', ['id'], selectedFeatureId]);
+                                    // clear hover layers so selection stands out
+                                    map.setFilter('polygon-hover', ['==', ['id'], -1]);
+                                    map.setFilter('polygon-hover-stroke', ['==', ['id'], -1]);
+                                }
+                            } catch (err) {
+                                // ignore any errors accessing DOM in unusual contexts
+                                console.warn('Could not scroll to list item:', err);
+                            }
+                        }
+                    });
+
+                    // Global map click (background) to clear selection when clicking empty space
+                    map.on('click', (e) => {
+                        const features = map.queryRenderedFeatures(e.point, { layers: ['polygon-fill'] });
+                        if (!features.length) {
+                            selectedFeatureId = null;
+                            map.setFilter('polygon-selected', ['==', ['id'], -1]);
+                            map.setFilter('polygon-selected-stroke', ['==', ['id'], -1]);
+                            document.querySelectorAll('.wilderness-item.highlighted').forEach(item => item.classList.remove('highlighted'));
+                        }
+                    });
+
+                })
+                .catch(error => {
+                    console.error('Error loading GeoJSON:', error);
+                    alert('Error loading GeoJSON file. Please make sure "all.geojson" exists in the same directory as this HTML file.');
+                });
+        });
+
+        // Optional: Add navigation controls
+        map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+        // Optional: Add fullscreen control
+        map.addControl(new maplibregl.FullscreenControl(), 'top-left');
+    </script>
+</body>
+
+</html>
