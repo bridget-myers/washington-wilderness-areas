@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MapLibre GL JS - GeoJSON Polygons</title>
-    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <title>Mapbox GL JS - GeoJSON Polygons</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
     <style>
         body {
             margin: 0;
@@ -141,11 +141,11 @@
             }
         }
 
-        .maplibregl-popup {
+        .mapboxgl-popup {
             max-width: 300px;
         }
 
-        .maplibregl-popup-content {
+        .mapboxgl-popup-content {
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
@@ -173,12 +173,71 @@
         .popup-info strong {
             color: #2c3e50;
         }
+
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            z-index: 1;
+        }
+
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .legend-label {
+            color: #555;
+            line-height: 1.2;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div id="map"></div>
+        <div id="map">
+            <div class="legend">
+                <div class="legend-title">Wilderness Areas</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #86a563;"></div>
+                    <div class="legend-label">USFS Wilderness</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #9c896f;"></div>
+                    <div class="legend-label">National Park Wilderness</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #feb417;"></div>
+                    <div class="legend-label">BLM Wilderness</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1189a7;"></div>
+                    <div class="legend-label">USFWS Wilderness</div>
+                </div>
+            </div>
+        </div>
         <div class="sidebar">
             <div class="sidebar-header">
                 Washington Wilderness Areas
@@ -188,12 +247,16 @@
     </div>
 
     <script>
-        // Initialize the map with a free light theme
-        const map = new maplibregl.Map({
+        // Set Mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1IjoiYnJpZGdldDRteWVycyIsImEiOiJjbWg1MXZ6Z2UwMWFuMmlvZjV0OTFjcjJmIn0.JkPsjDP9os3a9DW8wpNcFg';
+
+        // Initialize the map with custom Mapbox style
+        const map = new mapboxgl.Map({
             container: 'map',
-            style: 'https://tiles.basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            style: 'mapbox://styles/bridget4myers/cmh69pj2z00ac01s76xkaggl6',
             center: [0, 0],
-            zoom: 2
+            zoom: 2,
+            projection: 'mercator'
         });
 
         // Track currently selected feature (persistent selection)
@@ -202,7 +265,7 @@
         // Create a popup instance
         // Use closeOnClick: false so clicking another polygon doesn't only close the popup
         // and require a second click to open the new one.
-        const popup = new maplibregl.Popup({
+        const popup = new mapboxgl.Popup({
             closeButton: true,
             closeOnClick: false,
             offset: 10
@@ -210,7 +273,7 @@
 
         // Function to calculate bounds for a single feature
         function getFeatureBounds(feature) {
-            const bounds = new maplibregl.LngLatBounds();
+            const bounds = new mapboxgl.LngLatBounds();
 
             if (feature.geometry.type === 'Polygon') {
                 feature.geometry.coordinates[0].forEach(coord => {
@@ -313,9 +376,13 @@
                         'type': 'fill',
                         'source': 'polygons',
                         'paint': {
-                            'fill-color': '#3498db',
-                            'fill-opacity': 0.2, // Light default opacity
-                            'fill-outline-color': '#2980b9'
+                            'fill-color': ['case',
+                                ['has', 'color'],
+                                ['get', 'color'],
+                                '#86a561'
+                            ],
+                            'fill-opacity': 0.9, // Light default opacity
+
                         }
                     });
 
@@ -325,7 +392,7 @@
                         'type': 'line',
                         'source': 'polygons',
                         'paint': {
-                            'line-color': '#2980b9',
+                            'line-color': '#fff',
                             'line-width': 1,
                             'line-opacity': 0.5
                         }
@@ -381,7 +448,7 @@
                     });
 
                     // Calculate bounds and fit map to data
-                    const bounds = new maplibregl.LngLatBounds();
+                    const bounds = new mapboxgl.LngLatBounds();
                     data.features.forEach(feature => {
                         if (feature.geometry.type === 'Polygon') {
                             feature.geometry.coordinates[0].forEach(coord => {
@@ -513,10 +580,10 @@
         });
 
         // Optional: Add navigation controls
-        map.addControl(new maplibregl.NavigationControl(), 'top-left');
+        map.addControl(new mapboxgl.NavigationControl(), 'top-left');
 
         // Optional: Add fullscreen control
-        map.addControl(new maplibregl.FullscreenControl(), 'top-left');
+        map.addControl(new mapboxgl.FullscreenControl(), 'top-left');
     </script>
 </body>
 
