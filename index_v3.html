@@ -447,6 +447,19 @@
                         'filter': ['==', ['id'], -1]
                     });
 
+                    // // Add tree icon symbols in the center of each polygon
+                    // map.addLayer({
+                    //     'id': 'polygon-labels',
+                    //     'type': 'symbol',
+                    //     'source': 'polygons',
+                    //     'layout': {
+                    //         'icon-image': 'park',  // Mapbox built-in tree/park icon
+                    //         'icon-size': 2,
+                    //         'icon-allow-overlap': false,
+                    //         'icon-ignore-placement': false
+                    //     }
+                    // });
+
                     // Calculate bounds and fit map to data
                     const bounds = new mapboxgl.LngLatBounds();
                     data.features.forEach(feature => {
