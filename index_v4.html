@@ -253,7 +253,7 @@
         // Initialize the map with custom Mapbox style
         const map = new mapboxgl.Map({
             container: 'map',
-            style: 'mapbox://styles/bridget4myers/cmh69pj2z00ac01s76xkaggl6',
+            style: 'mapbox://styles/bridget4myers/cmi7gmckq001101r03p8hhm08',
             center: [0, 0],
             zoom: 2,
             projection: 'mercator'
@@ -269,6 +269,14 @@
             closeButton: true,
             closeOnClick: false,
             offset: 10
+        });
+
+        // Create a separate tooltip popup for hover (no close button, smaller)
+        const tooltipPopup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 5,
+            className: 'tooltip-popup'
         });
 
         // Function to calculate bounds for a single feature
@@ -460,6 +468,7 @@
                     //     }
                     // });
 
+
                     // Calculate bounds and fit map to data
                     const bounds = new mapboxgl.LngLatBounds();
                     data.features.forEach(feature => {
@@ -491,12 +500,22 @@
                         // Hide hover layers (but keep selection layers)
                         map.setFilter('polygon-hover', ['==', ['id'], -1]);
                         map.setFilter('polygon-hover-stroke', ['==', ['id'], -1]);
+                        // Remove tooltip
+                        tooltipPopup.remove();
                     });
 
                     map.on('mousemove', 'polygon-fill', (e) => {
                         if (e.features.length > 0) {
                             const feature = e.features[0];
                             const featureId = feature.id;
+                            const properties = feature.properties;
+
+                            // Show tooltip with area name
+                            const name = properties.name || properties.NAME || properties.WILDERNESS || 'Unnamed Area';
+                            tooltipPopup.setLngLat(e.lngLat)
+                                .setHTML(`<div style="font-size: 13px; padding: 2px 4px; font-weight: 500;">${name}</div>`)
+                                .addTo(map);
+
                             // Don't override persistent selection style; hover only if not selected
                             if (selectedFeatureId === null || selectedFeatureId !== featureId) {
                                 map.setFilter('polygon-hover', ['==', ['id'], featureId]);
