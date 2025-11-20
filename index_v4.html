@@ -254,7 +254,7 @@
         const map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/bridget4myers/cmi7gmckq001101r03p8hhm08',
-            center: [0, 0],
+            center: {lng: -120.9020314, lat: 47.454988693683106},
             zoom: 2,
             projection: 'mercator'
         });
@@ -403,7 +403,161 @@
                 }
             });
 
+            // Load the interstate icon image to the map
+            map.loadImage('interstate.png', (error, image) => {
+                if (error) throw error;
+                if (!map.hasImage('interstate-icon')) {
+                    map.addImage('interstate-icon', image);
+                }
 
+                // Add a new source for the points with interstate numbers
+                // Assuming you have a variable 'interstatePointsGeoJSON' with your points and properties
+                map.addSource('interstate-points', {
+                    'type': 'geojson',
+                    'data': {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 5
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -122.25714293798265,
+                                        48.25639039095154
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 0
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 90
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -121.74829993858904,
+                                        47.471316926659
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 1
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 5
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -122.94172919481596,
+                                        46.9299891984343
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 2
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 90
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -119.15837801465861,
+                                        47.098789300644796
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 3
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 90
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -116.11214902313826,
+                                        47.54278770473255
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 4
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 84
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -121.73480725735962,
+                                        45.69443880887306
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 5
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 82
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -120.26251428716635,
+                                        46.3991644659294
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 6
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {
+                                    "rid": 84
+                                },
+                                "geometry": {
+                                    "coordinates": [
+                                        -119.99174989498303,
+                                        45.79618418661826
+                                    ],
+                                    "type": "Point"
+                                },
+                                "id": 7
+                            }
+                        ]
+                    }
+                });
+
+                // Add a symbol layer to show icon + text
+                map.addLayer({
+                    'id': 'interstate-symbols',
+                    'type': 'symbol',
+                    'source': 'interstate-points',
+                    'layout': {
+                        'icon-image': 'interstate-icon',
+                        'icon-size': 1, // scale as needed
+                        'icon-anchor': 'center',
+                        'icon-offset': [0, 5], // icon centered, adjust Y offset if needed
+                        'text-field': ['get', 'rid'], // property holding the interstate number
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 14,
+                        'text-anchor': 'center',
+                        'text-offset': [0, 0.5], // text slightly below icon center
+                        'text-allow-overlap': true,
+                        'text-ignore-placement': true
+                    },
+                    'paint': {
+                        'text-color': '#fff',
+                        // 'text-halo-color': '#ffffff',
+                        'text-halo-width': 1,
+                    }
+                });
+            });
 
             // Load the GeoJSON file
             fetch('./all.geojson')
