@@ -386,6 +386,26 @@
 
         map.on('load', () => {
 
+            // Access the internal merged layers from Standard style
+            for (const layerId in map.style._mergedLayers) {
+                if (layerId.includes('poi-label')) {
+                    const layer = map.style._mergedLayers[layerId];
+                    // Set filter to exclude specific forest names
+                    layer.filter = [
+                        'all',
+                        ['!=', ['get', 'name'], 'Olympic Experimental State Forest'],
+                        ['!=', ['get', 'name'], 'Weyerhaeuser Vail Woodlands'],
+                        ['!=', ['get', 'name'], 'Northwest Timberlands'],
+                        ['!=', ['get', 'name'], 'Hancock Forest'],
+                        ['!=', ['get', 'name'], 'DNR'],
+                    ];
+                    map.style._updateLayer(layer);
+                }
+            }
+            map._update(true);
+
+
+
             // Add the world mask with hole around Washington
             map.addSource('mask', {
                 'type': 'geojson',
