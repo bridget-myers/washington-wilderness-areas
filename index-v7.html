@@ -1050,10 +1050,11 @@
 
                                 'Unnamed Polygon';
 
-                            // Build popup content
+                           // Build popup content
                             let popupContent = `
                                 <div class="popup-content">
                                     <div class="popup-title">${name}</div>
+                                    ${properties.description ? `<div class="popup-description">${properties.description}</div>` : ''}
                             `;
 
                             // Add other properties if they exist
