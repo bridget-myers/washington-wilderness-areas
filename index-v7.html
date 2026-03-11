@@ -76,6 +76,22 @@
             font-weight: 500;
         }
 
+        .popup-description {
+            color: #555;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 8px;
+        }
+        
+        .popup-description a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        .popup-description a:hover {
+            text-decoration: underline;
+        }
+
         /* Scrollbar styling for webkit browsers */
         .wilderness-list::-webkit-scrollbar {
             width: 6px;
@@ -339,6 +355,7 @@
                     let popupContent = `
                         <div class="popup-content">
                             <div class="popup-title">${name}</div>
+                            ${properties.description ? `<div class="popup-description">${properties.description}</div>` : ''}
                     `;
                     // (Optional) include more properties later if desired
                     popupContent += '</div>';
